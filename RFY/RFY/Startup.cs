@@ -7,8 +7,11 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
+using RFY.Data;
 
 namespace RFY
 {
@@ -32,7 +35,16 @@ namespace RFY
             });
 
 
+            services.AddDbContext<RFYContext>(options =>
+                   options.UseMySql(Configuration.GetConnectionString("DataAccessMySqlProvider")));
+
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+
+            services.Configure<ForwardedHeadersOptions>(options =>
+            {
+                options.ForwardedHeaders =
+                    ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -52,6 +64,15 @@ namespace RFY
             app.UseHttpsRedirection();
             app.UseStaticFiles();
             app.UseCookiePolicy();
+
+            app.UseAuthentication();
+
+            using (var serviceScope = app.ApplicationServices.GetRequiredService<IServiceScopeFactory>()
+             .CreateScope())
+            {
+                //serviceScope.ServiceProvider.GetService<ApplicationDbContext>().Database.EnsureCreated();
+                serviceScope.ServiceProvider.GetService<RFYContext>().Database.Migrate();
+            }
 
             app.UseMvc(routes =>
             {
